@@ -1,8 +1,17 @@
 import mongoose from "mongoose";
 
 const yearSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  order: { type: Number, default: 1 },
+  name: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  // optional but VERY useful for sorting
+  order: {
+    type: Number,
+    default: 0,
+  },
 });
 
 export default mongoose.model("Year", yearSchema);

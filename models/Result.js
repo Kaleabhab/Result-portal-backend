@@ -9,4 +9,4 @@ const resultSchema = new mongoose.Schema({
   uploadedAt: { type: Date, default: Date.now },
 });
 
-export const Result = mongoose.model("Result", resultSchema);
+export default mongoose.model("Result", resultSchema);

@@ -1,6 +1,8 @@
 import xlsx from "xlsx";
 import Result from "../models/Result.js";
-import Student from "../models/Student.js";
+//import { Result } from "../models/Result.js";
+//import Student from "../models/Student.js";
+import { Student } from "../models/Student.js";
 import Subject from "../models/Subject.js";
 
 export const uploadExcel = async (req, res) => {
