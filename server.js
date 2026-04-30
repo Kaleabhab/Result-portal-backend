@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import resultRoutes from "./routes/resultRoutes.js";
 import adminStructureRoutes from "./routes/adminRoutes.js";
+import gpaRoutes from "./routes/gpaRoutes.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/results", resultRoutes);
 app.use("/api/admin", adminStructureRoutes);
+app.use("/api/gpa", gpaRoutes);
 
 // DB CONNECT
 mongoose.connect(process.env.MONGO_URI)

@@ -4,24 +4,32 @@ import {
   calculateSemesterGPA,
 } from "../controllers/gpaController.js";
 
-import { protect, isAdmin } from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { isAdmin } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
-// MODULE RESULT
+
+// 🟢 MODULE RESULT (MAIN UNIT)
+// GET /api/gpa/module/:moduleId/:studentId
 router.get(
-  "/module/:studentId/:moduleId",
+  "/module/:moduleId/:studentId",
   protect,
-  isAdmin,
   calculateModuleResult
 );
 
-// GPA
+
+// 🟢 SEMESTER GPA
+// GET /api/gpa/semester/:semesterId/:studentId
 router.get(
-  "/semester/:studentId/:semesterId",
+  "/semester/:semesterId/:studentId",
   protect,
-  isAdmin,
   calculateSemesterGPA
 );
+
+
+// 🟢 (OPTIONAL) ADMIN VIEW ANY STUDENT
+// you can restrict later if needed
+// router.get("/admin/module/:moduleId/:studentId", protect, isAdmin, calculateModuleResult);
 
 export default router;

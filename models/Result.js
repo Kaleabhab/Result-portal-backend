@@ -1,12 +1,50 @@
 import mongoose from "mongoose";
 
-const resultSchema = new mongoose.Schema({
-  studentId: String,
-  subjectId: String,
-  moduleId: String,
-  score: Number,
-  released: { type: Boolean, default: false },
-  uploadedAt: { type: Date, default: Date.now },
-});
+const resultSchema = new mongoose.Schema(
+  {
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student",
+      required: true,
+    },
 
-export default mongoose.model("Result", resultSchema);
+    subjectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subject",
+      required: true,
+    },
+
+    moduleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Module",
+      required: true,
+    },
+
+    score: {
+      type: Number,
+      required: true,
+    },
+
+    maxScore: {
+      type: Number,
+      required: true,
+    },
+
+    percentage: Number,
+
+    grade: String,
+
+    released: {
+      type: Boolean,
+      default: false,
+    },
+
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  },
+  { timestamps: true }
+);
+
+export const Result = mongoose.model("Result", resultSchema);

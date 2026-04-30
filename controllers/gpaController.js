@@ -1,35 +1,60 @@
-import Result from "../models/Result.js";
-import Subject from "../models/Subject.js";
+import { Result } from "../models/Result.js";
+import { getGradePoint, getLetterGrade } from "../utils/gpaCalculator.js";
+
 export const calculateModuleResult = async (req, res) => {
   try {
     const { studentId, moduleId } = req.params;
 
-    // 1. GET ALL RESULTS
-    const results = await Result.find({ studentId, moduleId });
+    const results = await Result.find({
+      studentId,
+      moduleId,
+    }).populate("subjectId");
 
     if (!results.length) {
-      return res.status(404).json({ message: "No results found" });
+      return res.json({
+        modulePercent: 0,
+        gpa: 0,
+        grade: "F",
+      });
     }
 
-    let total = 0;
+    let totalWeighted = 0;
+    let totalWeight = 0;
 
-    // 2. LOOP RESULTS
+    const breakdown = [];
+
     for (const r of results) {
-      const subject = await Subject.findById(r.subjectId);
-
+      const subject = r.subjectId;
       if (!subject) continue;
 
-      // weighted score
-      const scorePercent = (r.score / r.maxScore) * 100;
-      const weighted = (scorePercent * subject.weightPercentage) / 100;
+      const percent = (r.score / r.maxScore) * 100;
+      const weight = subject.weightPercentage || 0;
 
-      total += weighted;
+      const contribution = (percent * weight) / 100;
+
+      totalWeighted += contribution;
+      totalWeight += weight;
+
+      breakdown.push({
+        subject: subject.name,
+        percent,
+        weight,
+        contribution,
+      });
     }
+
+    const modulePercent = totalWeighted;
+
+    const gpa = getGradePoint(modulePercent);
+    const grade = getLetterGrade(modulePercent);
 
     res.json({
       studentId,
       moduleId,
-      moduleScore: total.toFixed(2),
+      modulePercent: modulePercent.toFixed(2),
+      gpa,
+      grade,
+      breakdown,
     });
   } catch (err) {
     console.error(err);
@@ -42,41 +67,63 @@ export const calculateSemesterGPA = async (req, res) => {
 
     const results = await Result.find({ studentId }).populate("subjectId");
 
-    let moduleMap = {};
+    const moduleMap = {};
 
-    // group by module
+    // 🔹 GROUP BY MODULE
     for (const r of results) {
-      const moduleId = r.moduleId;
+      const moduleId = r.moduleId?.toString();
+      if (!moduleId) continue;
 
       if (!moduleMap[moduleId]) {
-        moduleMap[moduleId] = 0;
+        moduleMap[moduleId] = {
+          totalWeighted: 0,
+          totalWeight: 0,
+        };
       }
 
       const subject = r.subjectId;
+      if (!subject) continue;
 
-      const scorePercent = (r.score / r.maxScore) * 100;
-      const weighted = (scorePercent * subject.weightPercentage) / 100;
+      const percent = (r.score / r.maxScore) * 100;
+      const weight = subject.weightPercentage || 0;
 
-      moduleMap[moduleId] += weighted;
+      const contribution = (percent * weight) / 100;
+
+      moduleMap[moduleId].totalWeighted += contribution;
+      moduleMap[moduleId].totalWeight += weight;
     }
 
-    // GPA conversion
-    let total = 0;
-    let count = 0;
+    // 🔹 CONVERT EACH MODULE → GPA
+    let totalGpa = 0;
+    let moduleCount = 0;
 
-    for (const m of Object.values(moduleMap)) {
-      total += m;
-      count++;
+    const modules = [];
+
+    for (const [moduleId, data] of Object.entries(moduleMap)) {
+      const modulePercent = data.totalWeighted;
+
+      const moduleGpa = getGradePoint(modulePercent);
+
+      totalGpa += moduleGpa;
+      moduleCount++;
+
+      modules.push({
+        moduleId,
+        modulePercent: modulePercent.toFixed(2),
+        moduleGpa,
+      });
     }
 
-    const gpa = total / count;
+    const semesterGpa = moduleCount ? totalGpa / moduleCount : 0;
 
     res.json({
       studentId,
       semesterId,
-      gpa: gpa.toFixed(2),
+      semesterGpa: semesterGpa.toFixed(2),
+      modules,
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "GPA error" });
   }
 };
