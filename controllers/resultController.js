@@ -67,7 +67,6 @@ export const addResult = async (req, res) => {
 // ===============================
 export const uploadResults = async (req, res) => {
   try {
-    
     const file = req.file;
     const { subjectId, moduleId, maxScore } = req.body;
 
@@ -75,40 +74,58 @@ export const uploadResults = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    if (!maxScore || maxScore <= 0) {
+      return res.status(400).json({ message: "Invalid maxScore" });
+    }
+
     const workbook = xlsx.read(file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json(sheet);
 
-    const inserted = [];
+    // ✅ Extract studentIds
+    const studentIds = rows.map(r => r.studentId || r["Student ID"]);
+
+    // ✅ Fetch all students in ONE query
+    const students = await Student.find({
+      studentId: { $in: studentIds }
+    });
+
+    const studentMap = new Map(
+      students.map(s => [s.studentId, s._id])
+    );
+
+    const prepared = [];
 
     for (const row of rows) {
-      // Excel format: studentId | score
+      const studentIdRaw = row.studentId || row["Student ID"];
+      const score = Number(row.score || row["Score"] || row["Marks"]);
 
-      const student = await Student.findOne({
-        studentId: row.studentId,
-      });
+      const studentObjectId = studentMap.get(studentIdRaw);
 
-      if (!student) continue;
+      if (!studentObjectId) continue;
+      if (isNaN(score)) continue;
 
-      const percentage = (row.score / maxScore) * 100;
+      const percentage = (score / maxScore) * 100;
 
-      const result = await Result.create({
-        studentId: student._id,
+      prepared.push({
+        studentId: studentObjectId,
         subjectId,
         moduleId,
-        score: row.score,
+        score,
         maxScore,
         percentage,
         uploadedBy: req.user.id,
       });
-
-      inserted.push(result);
     }
+
+    // ✅ Insert all at once
+    const inserted = await Result.insertMany(prepared);
 
     res.json({
       message: "Excel uploaded successfully",
       count: inserted.length,
     });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Upload failed" });

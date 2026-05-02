@@ -5,6 +5,11 @@ const studentSchema = new mongoose.Schema({
   displayName: { type: String, required: true },
   email: String,
   classId: String,
+    yearId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "Year",
+      required: true,
+    },
   uid: String, // optional (if linked with user login)
 });
 

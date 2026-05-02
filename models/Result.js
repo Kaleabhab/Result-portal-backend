@@ -46,5 +46,8 @@ const resultSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
+resultSchema.index(
+  { studentId: 1, subjectId: 1, moduleId: 1 },
+  { unique: true }
+);
 export const Result = mongoose.model("Result", resultSchema);
