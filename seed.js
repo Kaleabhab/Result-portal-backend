@@ -1,138 +1,135 @@
+console.log("🔥 Seed script started...");
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 
+//import User from "./models/User.js";
 import { User } from "./models/User.js";
+//import Student from "./models/Student.js";
 import { Student } from "./models/Student.js";
-import { Subject } from "./models/Subject.js";
-import { Result } from "./models/Result.js";
 
 dotenv.config();
 
-// CONNECT DB
-await mongoose.connect(process.env.MONGO_URI);
-console.log("✅ MongoDB connected");
+// =======================
+// DB CONNECT
+// =======================
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ MongoDB connected");
+  } catch (err) {
+    console.error("❌ DB Error:", err.message);
+    process.exit(1);
+  }
+};
 
 // =======================
 // SAMPLE DATA
 // =======================
 
-// ADMIN
+// 👨‍💼 ADMINS
 const admins = [
-{
-  email: "admin@school.com",
-  password: await bcrypt.hash("Admin@123", 10),
-  role: "admin",
-  displayName: "Principal Office",
-},
-
-];
-
-// STUDENT USER
-const students = [
-{
-  email: "habtamu@school.com",
-  password: await bcrypt.hash("Student@123", 10),
-  role: "student",
-  studentId: "UGPR169/16",
-  name: "Habtamu Worku",
-  classId: "class-2024-A",
-},
-
-];
-
-
-// STUDENT PROFILE
-
-
-
-// SUBJECTS
-const subjects = [
-  { name: "Exam", moduleId: "programming", weightPercentage: 60 },
-  { name: "Lab", moduleId: "programming", weightPercentage: 40 },
-];
-
-// RESULTS
-const results = [
   {
-    studentId: "UGPR169/16",
-    subjectId: "Exam",
-    moduleId: "programming",
-    score: 80,
-    released: true,
+    email: "Kaleab.AM16@hu.edu.et",
+    password: "Kb@1452",
+    displayName: "IT ADMIN",
   },
   {
-    studentId: "UGPR169/16",
-    subjectId: "Lab",
-    moduleId: "programming",
-    score: 90,
-    released: true,
+    email: "Representative.AM16@hu.edu.com",
+    password: "Registrar@123",
+    displayName: "Representative",
+  },
+];
+
+// 🎓 STUDENTS
+const students = [
+  {
+    email: "Kaleab.SM16-1693@hu.edu.et",
+    password: "Kb@1452",
+    studentId: "UGPR1693/16",
+    displayName: "Kaleab Habtamu WYohannes",
+    classId: "class-2016-med",
+  },
+  {
+    email: "Girum.SM16-1420@hu.edu.et",
+    password: "Student@123",
+    studentId: "UGPR1420/16",
+    displayName: "Girum Gulilat Guja",
+    classId: "class-2016-med",
   },
 ];
 
 // =======================
 // SEED FUNCTION
 // =======================
-
 const seed = async () => {
   try {
-    console.log("🔥 Seeding started...");
+    console.log("🧹 Clearing old data...");
 
-    // CLEAR OLD DATA (optional)
     await User.deleteMany();
     await Student.deleteMany();
-    await Subject.deleteMany();
-    await Result.deleteMany();
 
-    // CREATE ADMIN
-    for (const adminDataItem of admins) {
-      await User.create(adminDataItem);
+    console.log("🔥 Seeding admins...");
+
+    // =======================
+    // CREATE ADMINS
+    // =======================
+    for (const a of admins) {
+      const hashed = await bcrypt.hash(a.password, 10);
+
+      await User.create({
+        email: a.email,
+        password: hashed,
+        role: "admin",
+        displayName: a.displayName,
+      });
     }
-    console.log("✅ Admin(s) created");
 
+    console.log("👨‍💼 Admins created");
 
-    
-    // =========================
-    // 2. CREATE STUDENTS (USER + PROFILE TOGETHER)
-    // =========================
+    // =======================
+    // CREATE STUDENTS
+    // =======================
+    console.log("🎓 Seeding students...");
+
     for (const s of students) {
-      // create user
+      const year = await Year.findOne();
+      const hashed = await bcrypt.hash(s.password, 10);
+
+      // 1. Create user
       const user = await User.create({
         email: s.email,
-        password: s.password,
-        role: s.role,
+        password: hashed,
+        role: "student",
+        displayName: s.displayName,
         studentId: s.studentId,
-        name: s.name,
         classId: s.classId,
+         yearId: year._id,  // ✅ ADD THIS
       });
 
-      // create student profile (linked)
+      // 2. Create student profile
       await Student.create({
+        userId: user._id,
         studentId: s.studentId,
-        name: s.name,
+        displayName: s.displayName,
         email: s.email,
         classId: s.classId,
-        userId: user._id, // 🔥 correct linking
       });
     }
 
-    console.log("✅ Student created");
+    console.log("🎓 Students created");
 
-    // CREATE SUBJECTS
-    await Subject.insertMany(subjects);
-    console.log("✅ Subjects added");
+    console.log("🎉 SEEDING COMPLETED SUCCESSFULLY");
 
-    // CREATE RESULTS
-    await Result.insertMany(results);
-    console.log("✅ Results added");
-
-    console.log("🎉 ALL DATA SEEDED");
     process.exit();
-
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error("❌ Seed error:", err);
     process.exit(1);
   }
 };
 
-seed();
+// =======================
+// RUN
+// =======================
+connectDB().then(seed);
