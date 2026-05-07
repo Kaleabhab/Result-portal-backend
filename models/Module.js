@@ -28,7 +28,7 @@ const moduleSchema = new mongoose.Schema({
   // (Recommended for GPA weighting)
   credit: {
     type: Number,
-    default: 1,
+    default: 10,
   },
 },
 {
