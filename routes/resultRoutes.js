@@ -17,7 +17,7 @@ import { isAdmin } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
-router.get('/stats', isAdmin, getResultsStats);
+router.get('/stats', protect, isAdmin, getResultsStats);
 // 🔹 manual add
 router.post("/add", protect, isAdmin, addResult);
 
@@ -51,7 +51,7 @@ router.delete("/:id", protect, isAdmin, deleteResult);
 router.get("/subject/:subjectId", protect, getResultsBySubject);
 
 // 🔹 student results
-router.get("/student/:studentId", protect, getStudentResults);
+router.get("/students/:studentId", protect, getStudentResults);
 
 // 🔹 release
 router.put("/release/:subjectId", protect, isAdmin, releaseResults);
