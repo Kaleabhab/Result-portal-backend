@@ -213,14 +213,19 @@ export const getResultsBySubject = async (req, res) => {
 // ===============================
 export const getStudentResults = async (req, res) => {
   try {
-    const { studentId } = req.params;
+    const studentId = req.params.studentId;
 
-    const results = await Result.find({ studentId })
-      .populate("subjectId", "name weight moduleId");
+    console.log("PARAM:", studentId);
+
+    const results = await Result.find({ studentId });
 
     res.json(results);
+
   } catch (err) {
-    res.status(500).json({ message: "Fetch failed" });
+    console.error(err);
+    res.status(500).json({
+      error: err.message,
+    });
   }
 };
 

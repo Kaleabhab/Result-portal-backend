@@ -33,14 +33,20 @@ export const login = async (req, res) => {
 
     // 4. SEND RESPONSE
     res.json({
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        displayName: user.displayName,
-      },
-    });
+  token,
+  user: {
+    id: user._id,
+    email: user.email,
+    role: user.role,
+
+    studentId: user.studentId, // ✅ ADD THIS
+
+    displayName:
+      user.displayName ||
+      user.name ||
+      "Student",
+  },
+});
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -53,18 +59,30 @@ export const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      email,
-      password: hashedPassword,
-      role,
-      displayName,
-      studentId,
-    });
+    const token = jwt.sign(
+  {
+    id: user._id,
+    role: user.role,
+    studentId: user.studentId,
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "1d" }
+);
 
-    res.json({
-      message: "User created",
-      userId: user._id,
-    });
+res.json({
+  token,
+  user: {
+    id: user._id,
+    email: user.email,
+    role: user.role,
+
+    studentId: user.studentId,
+
+    displayName:
+      user.displayName ||
+      "Student",
+  },
+});
 
   } catch (err) {
     res.status(500).json({ error: err.message });
