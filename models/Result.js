@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const resultSchema = new mongoose.Schema(
   {
     studentId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
       required: true,
     },
@@ -20,19 +20,35 @@ const resultSchema = new mongoose.Schema(
       required: true,
     },
 
+    // student raw score
     score: {
       type: Number,
       required: true,
     },
 
+    // exam total
     maxScore: {
       type: Number,
       required: true,
     },
 
-    percentage: Number,
+    // Histology = 10%
+    subjectWeight: {
+      type: Number,
+      required: true,
+    },
 
-    grade: String,
+    // actual earned module %
+    // example = 8%
+    contributionToModule: {
+      type: Number,
+      required: true,
+    },
+
+    grade: {
+      type: String,
+      default: null,
+    },
 
     released: {
       type: Boolean,
@@ -46,8 +62,19 @@ const resultSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 resultSchema.index(
-  { studentId: 1, subjectId: 1, moduleId: 1 },
-  { unique: true }
+  {
+    studentId: 1,
+    subjectId: 1,
+    moduleId: 1,
+  },
+  {
+    unique: true,
+  }
 );
-export const Result = mongoose.model("Result", resultSchema);
+
+export const Result = mongoose.model(
+  "Result",
+  resultSchema
+);

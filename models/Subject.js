@@ -19,6 +19,7 @@ const subjectSchema = new mongoose.Schema({
     required: true,
     index:true,
   },
+  
 
   weight: { 
     type: Number, 

@@ -28,6 +28,8 @@ const moduleSchema = new mongoose.Schema({
   // (Recommended for GPA weighting)
   credit: {
     type: Number,
+    required: true,
+    min: 1,
     default: 10,
   },
 },
