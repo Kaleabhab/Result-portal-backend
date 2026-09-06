@@ -31,6 +31,11 @@ const resultSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+     // NEW: Store calculated percentage (score/maxScore * 100)
+    percentage: {
+      type: Number,
+      required: true,
+    },
 
     // Histology = 10%
     subjectWeight: {
@@ -45,10 +50,25 @@ const resultSchema = new mongoose.Schema(
       required: true,
     },
 
+
     grade: {
       type: String,
       default: null,
     },
+     // GPA support (IMPORTANT ADDITION)
+    gradePoint: {
+      type: Number,
+      default: 0,
+    },
+
+    status: {
+  type: String,
+  enum: [
+    "PASS",
+    "RE-EXAM",
+    "RETAKE",
+  ],
+},
 
     released: {
       type: Boolean,

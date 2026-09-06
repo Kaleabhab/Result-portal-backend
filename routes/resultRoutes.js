@@ -3,7 +3,7 @@ import {
   getResultsStats,
   addResult,
   uploadResults,
-  bulkCreateResults,
+ // bulkCreateResults,
   updateResult,
   deleteResult,
   getResultsBySubject,
@@ -33,7 +33,7 @@ router.post(
 // ==========================
 // 🟢 BULK CREATE
 // ==========================
-router.post("/bulk", protect, isAdmin, bulkCreateResults);
+//router.post("/bulk", protect, isAdmin, bulkCreateResults);
 
 // ==========================
 // 🟢 UPDATE
