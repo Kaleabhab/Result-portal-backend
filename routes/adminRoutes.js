@@ -1,56 +1,34 @@
-import express from "express";
+import express from 'express';
 import {
-  createYear,
-  updateYear,
-  deleteYear,
-
-  createSemester,
-  updateSemester,
-  deleteSemester,
-
-  createModule,
-  updateModule,
-  deleteModule,
-
-  createSubject,
-  updateSubject,
-  deleteSubject,
-
-  getStructure,
-} from "../controllers/adminStructureController.js";
-import { protect } from "../middleware/authMiddleware.js";
-import { isAdmin } from "../middleware/roleMiddleware.js";
-
+  registerStudent,
+  bulkRegisterStudents,
+  adminGetStudents,
+  adminGetStudent,
+  resetPassword,
+  activateStudent,
+  deactivateStudent,
+} from '../controllers/adminController.js';
+import protect from '../middleware/auth.js';
+import { adminOnly } from '../middleware/role.js';
+import uploadExcel from '../middleware/upload.js';
 
 const router = express.Router();
 
-// 🔐 ALL ADMIN ROUTES PROTECTED
-router.use(protect, isAdmin);
+// All admin routes require authentication and admin role
+router.use(protect);
+router.use(adminOnly);
 
-// ================= STRUCTURE =================
-router.get("/structure", getStructure);
+// Student Registration
+router.post('/students', registerStudent);
+router.post('/students/upload', uploadExcel, bulkRegisterStudents);
 
-// ================= YEAR =================
-router.post("/year", createYear);
-router.put("/year/:id", updateYear);
-router.delete("/year/:id", deleteYear);
+// Student Management (Read)
+router.get('/students', adminGetStudents);
+router.get('/students/:studentId', adminGetStudent);
 
-// ================= SEMESTER =================
-router.post("/semester", createSemester);
-router.put("/semester/:id", updateSemester);
-router.delete("/semester/:id", deleteSemester);
-
-// ================= MODULE =================
-router.post("/module", createModule);
-router.put("/module/:id", updateModule);
-router.delete("/module/:id", deleteModule);
-
-// ================= SUBJECT =================
-router.post("/subject", createSubject);
-router.put("/subject/:id", updateSubject);
-router.delete("/subject/:id", deleteSubject);
-
-
-
+// Account Management
+router.post('/students/:studentId/reset-password', resetPassword);
+router.patch('/students/:studentId/activate', activateStudent);
+router.patch('/students/:studentId/deactivate', deactivateStudent);
 
 export default router;

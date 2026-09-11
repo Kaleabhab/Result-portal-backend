@@ -1,31 +1,28 @@
-import express from "express";
-import {
-  createStudent,
-  getStudents,
-  getStudent,
-  updateStudent,
-  deleteStudent,
-  getStudentStructure,
-} from "../controllers/studentController.js";
-import { protect } from "../middleware/authMiddleware.js";
-import { isAdmin } from "../middleware/roleMiddleware.js";
-
+const express = require('express');
 const router = express.Router();
+const {
+  registerStudent,
+  bulkRegisterStudents,
+  adminGetStudents,
+  adminGetStudent,
+  getMyProfile,
+  updateMyProfile,
+  activateStudent,
+  deactivateStudent
+} = require('../controllers/studentController');
+const { protect } = require('../middleware/authMiddleware');
+const { adminOnly, studentOnly } = require('../middleware/roleMiddleware');
 
-router.get("/structure", protect, getStudentStructure);
+// Student-facing routes
+router.get('/me', protect, studentOnly, getMyProfile);
+router.patch('/me', protect, studentOnly, updateMyProfile);
 
-// Authenticated users
-router.get("/", protect, getStudents);
-router.get("/:id", protect, getStudent);
+// Admin-only routes
+router.post('/admin/register', protect, adminOnly, registerStudent);
+router.post('/admin/bulk-register', protect, adminOnly, bulkRegisterStudents);
+router.get('/admin', protect, adminOnly, adminGetStudents);
+router.get('/admin/:studentId', protect, adminOnly, adminGetStudent);
+router.patch('/admin/:studentId/activate', protect, adminOnly, activateStudent);
+router.patch('/admin/:studentId/deactivate', protect, adminOnly, deactivateStudent);
 
-//Admin only
-
-router.post("/", protect, isAdmin, createStudent);
-router.put("/:id", protect, isAdmin, updateStudent);
-router.delete("/:id", protect, isAdmin, deleteStudent);
-
-
-
-
-
-export default router;
+module.exports = router;
