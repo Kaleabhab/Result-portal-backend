@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/authRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const academicRoutes = require('./routes/academicRoutes');
+const resultRoutes = require('./routes/resultRoutes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/admin/academic', academicRoutes);
+app.use('/api/results', resultRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
