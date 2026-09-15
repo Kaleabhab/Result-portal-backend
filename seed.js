@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+//const bcrypt = require('bcryptjs');
 
 // Models
 const User = require('./models/User');
@@ -53,10 +53,10 @@ const seedDatabase = async () => {
     // 1. CREATE ADMIN
     // ============================================================
     console.log('\n👤 Creating admin...');
-    const adminPassword = await bcrypt.hash('Admin123!', 10);
+  //  const adminPassword = await bcrypt.hash('Admin123!', 10);
     const admin = await User.create({
       email: 'admin@university.edu',
-      password: adminPassword,
+      password: 'Admin123!',
       role: 'admin',
       displayName: 'System Administrator',
       isActive: true,

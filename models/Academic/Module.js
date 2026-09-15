@@ -18,39 +18,61 @@ const moduleSchema = new mongoose.Schema({
     ref: 'AcademicPeriod',
     required: [true, 'Academic period ID is required']
   },
+
+  // ========== MODULE CATEGORY ==========
   category: {
     type: String,
-    enum: ['core', 'elective', 'foundation', 'specialization'],
-    default: 'core'
+    enum: ['MAJOR', 'MINOR'],
+    default: 'MAJOR'
   },
+
+  // ========== DELIVERY MODEL ==========
+  // Determines how results are structured:
+  // - SYSTEM_BASED: Module → Subject → Result
+  // - ASSESSMENT_BASED: Module → AssessmentComponent → Result
+  deliveryModel: {
+    type: String,
+    enum: ['SYSTEM_BASED', 'ASSESSMENT_BASED'],
+    default: 'SYSTEM_BASED',
+    required: true
+  },
+
+  // ========== NEW: PROGRESSION CHARACTERISTIC ==========
+  // Determines how this specific module affects progression
+  progressionCharacteristic: {
+    type: String,
+    enum: ['ONE_YEAR_LAG', 'ONE_SEMESTER_LAG', 'NO_LAG'],
+    default: 'NO_LAG'
+  },
+
   progressionRule: {
     type: String,
     enum: ['pass_all', 'pass_most', 'weighted_average', 'none'],
     default: 'pass_all'
   },
-  deliveryModel: {
-    type: String,
-    enum: ['in_person', 'online', 'hybrid', 'blended'],
-    default: 'in_person'
-  },
+
   prerequisites: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Module'
   }],
+
   credit: {
     type: Number,
     min: 0,
     default: 0
   },
+
   order: {
     type: Number,
     min: 0,
     default: 0
   },
+
   description: {
     type: String,
     trim: true
   },
+
   isActive: {
     type: Boolean,
     default: true
@@ -75,6 +97,21 @@ moduleSchema.virtual('subjects', {
   localField: '_id',
   foreignField: 'moduleId'
 });
+
+moduleSchema.virtual('assessmentComponents', {
+  ref: 'AssessmentComponent',
+  localField: '_id',
+  foreignField: 'moduleId'
+});
+
+// Helper: Get components based on delivery model
+moduleSchema.methods.getComponents = async function() {
+  if (this.deliveryModel === 'SYSTEM_BASED') {
+    return await mongoose.model('Subject').find({ moduleId: this._id, isActive: true });
+  } else {
+    return await mongoose.model('AssessmentComponent').find({ moduleId: this._id, isActive: true });
+  }
+};
 
 moduleSchema.set('toJSON', { virtuals: true });
 moduleSchema.set('toObject', { virtuals: true });
