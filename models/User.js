@@ -17,10 +17,43 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'admin'],
-    default: 'student',
+    enum: [
+      'super_admin',
+      'it_admin',
+      'department_admin',
+      'registration_admin',
+      'class_admin',
+      'student'
+    ],
+    
     required: true
   },
+
+   // ========== SCOPE ==========
+  // Which fields apply depends on the role
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    default: null
+  },
+  departmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+    default: null
+  },
+  academicLevelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicLevel',
+    default: null
+  },
+  classId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    default: null
+  },
+
+  // Student-specific
+
   studentId: {
     type: String,
     sparse: true,
@@ -48,10 +81,29 @@ const userSchema = new mongoose.Schema({
     type: Date
   },
   passwordResetToken: String,
-  passwordResetExpires: Date
+  passwordResetExpires: Date,
+
+  // ========== AUDIT FIELDS ==========
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  }
 }, {
   timestamps: true
 });
+
+// ========== INDEXES ==========
+userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ collegeId: 1 });
+userSchema.index({ departmentId: 1 });
+userSchema.index({ classId: 1 });
+userSchema.index({ studentId: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -79,9 +131,29 @@ userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
   }
   return false;
 };
+// Check if this user is any type of admin
+userSchema.methods.isAdmin = function() {
+  return [
+    'super_admin',
+    'it_admin',
+    'department_admin',
+    'registration_admin',
+    'class_admin'
+  ].includes(this.role);
+};
+
+// Get the scope object for this user
+userSchema.methods.getScope = function() {
+  return {
+    collegeId: this.collegeId,
+    departmentId: this.departmentId,
+    academicLevelId: this.academicLevelId,
+    classId: this.classId
+  };
+};
 
 // Create index for studentId for faster lookups
-userSchema.index({ studentId: 1 });
+//userSchema.index({ studentId: 1 });
 
 const User = mongoose.model('User', userSchema);
 

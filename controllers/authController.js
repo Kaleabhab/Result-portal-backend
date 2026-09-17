@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Student = require('../models/Student');
+const auditService = require('../services/auditLogService');
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -51,12 +52,35 @@ const login = async (req, res) => {
       });
     }
 
+
+    // After failed password match
+    const auditService = require('../services/auditLogService');
+    await auditService.log({
+      actorId: user._id,
+      actorRole: user.role,
+      actorEmail: user.email,
+      action: 'LOGIN_FAILED',
+      targetType: 'User',
+      targetId: user._id,
+      result: 'FAILURE',
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+     description: 'Invalid password'
+});
+
     // Update last login
     user.lastLogin = new Date();
     await user.save();
 
     // Generate token
     const token = generateToken(user._id);
+    // Log audit
+    const auditService = require('../services/auditLogService');
+    await auditService.logFromRequest(req, 'LOGIN', {
+     targetType: 'User',
+    targetId: user._id,
+    metadata: { role: user.role }
+    });
 
     // Prepare response
     const userResponse = {

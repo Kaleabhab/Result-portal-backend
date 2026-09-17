@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { requireRoles } = require('../middleware/roleMiddleware');
+const { requirePermission } = require('../middleware/permissionMiddleware');
+const { requireScope } = require('../middleware/scopeMiddleware');
 
 const {
   // College
