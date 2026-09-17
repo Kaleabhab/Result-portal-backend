@@ -1,407 +1,372 @@
-import bcrypt from 'bcrypt';
-import { Student } from '../models/Student.js';
-import { User } from '../models/User.js';
-import { BCRYPT_ROUNDS, ROLES } from '../utils/constants.js';
-import { generatePasswordFromNameAndId } from '../utils/generatePassword.js';
-import { validateStudentData } from '../utils/validation.js';
-import { parseStudentExcel } from '../services/excelService.js';
-
 /**
- * Register a single student (admin only)
- * POST /api/admin/students
+ * Admin Controller
+ * Handles admin account management for all roles
  */
-export const registerStudent = async (req, res, next) => {
+
+const User = require('../models/User');
+const adminService = require('../services/adminService');
+const auditService = require('../services/auditLogService');
+
+// ============================================================
+// Internal helper — create admin by role
+// ============================================================
+const createAdminByRole = async (req, res, targetRole) => {
   try {
-    const studentData = req.body;
+    // Check privilege escalation
+    if (!adminService.canCreateRole(req.user.role, targetRole)) {
+      await auditService.logFromRequest(req, 'ADMIN_CREATE_DENIED', {
+        result: 'FAILURE',
+        targetType: 'User',
+        description: `Role ${req.user.role} cannot create ${targetRole}`
+      });
 
-    const validationError = validateStudentData(studentData);
-    if (validationError) {
-      return res.status(400).json({
+      return res.status(403).json({
         success: false,
-        message: validationError,
+        message: `Your role cannot create a ${targetRole}`
       });
     }
 
-    const existingStudent = await Student.findOne({ studentId: studentData.studentId });
-    if (existingStudent) {
+    const { displayName, email, collegeId, departmentId, classId } = req.body;
+
+    if (!displayName || !email) {
       return res.status(400).json({
         success: false,
-        message: `Student ID ${studentData.studentId} already exists`,
+        message: 'displayName and email are required'
       });
     }
 
-    const existingEmailStudent = await Student.findOne({ email: studentData.email.toLowerCase() });
-    if (existingEmailStudent) {
-      return res.status(400).json({
-        success: false,
-        message: `Email ${studentData.email} already registered as a student`,
-      });
-    }
-    const existingEmailUser = await User.findOne({ email: studentData.email.toLowerCase() });
-    if (existingEmailUser) {
-      return res.status(400).json({
-        success: false,
-        message: `Email ${studentData.email} already has a user account`,
-      });
-    }
-
-    const student = new Student({
-      ...studentData,
-      email: studentData.email.toLowerCase(),
+    const result = await adminService.createAdminAccount({
+      displayName,
+      email,
+      role: targetRole,
+      scope: { collegeId, departmentId, classId },
+      createdBy: req.user._id
     });
-    await student.save();
 
-    const tempPassword = generatePasswordFromNameAndId(
-      studentData.fullName,
-      studentData.studentId
-    );
-    const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
-    const hashedPassword = await bcrypt.hash(tempPassword, salt);
-
-    const user = new User({
-      email: studentData.email.toLowerCase(),
-      password: hashedPassword,
-      role: ROLES.STUDENT,
-      studentId: studentData.studentId,
-      isActive: true,
-      mustChangePassword: true,
-    });
-    await user.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Student registered successfully',
-      data: {
-        student: {
-          studentId: student.studentId,
-          fullName: student.fullName,
-          email: student.email,
-        },
-        temporaryPassword: tempPassword,
-        mustChangePassword: true,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Bulk registration via Excel upload
- * POST /api/admin/students/upload
- */
-export const bulkRegisterStudents = async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded',
-      });
-    }
-
-    const studentsData = parseStudentExcel(req.file.buffer);
-    if (studentsData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid student data found in file',
-      });
-    }
-
-    const results = {
-      success: [],
-      failed: [],
-    };
-
-    for (const data of studentsData) {
-      try {
-        const validationError = validateStudentData(data);
-        if (validationError) {
-          results.failed.push({ ...data, reason: validationError });
-          continue;
-        }
-
-        const existingStudent = await Student.findOne({ studentId: data.studentId });
-        if (existingStudent) {
-          results.failed.push({ ...data, reason: `Student ID ${data.studentId} already exists` });
-          continue;
-        }
-        const existingEmailStudent = await Student.findOne({ email: data.email.toLowerCase() });
-        if (existingEmailStudent) {
-          results.failed.push({ ...data, reason: `Email ${data.email} already registered as a student` });
-          continue;
-        }
-        const existingEmailUser = await User.findOne({ email: data.email.toLowerCase() });
-        if (existingEmailUser) {
-          results.failed.push({ ...data, reason: `Email ${data.email} already has a user account` });
-          continue;
-        }
-
-        const student = new Student({
-          ...data,
-          email: data.email.toLowerCase(),
-        });
-        await student.save();
-
-        const tempPassword = generatePasswordFromNameAndId(data.fullName, data.studentId);
-        const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
-        const hashedPassword = await bcrypt.hash(tempPassword, salt);
-
-        const user = new User({
-          email: data.email.toLowerCase(),
-          password: hashedPassword,
-          role: ROLES.STUDENT,
-          studentId: data.studentId,
-          isActive: true,
-          mustChangePassword: true,
-        });
-        await user.save();
-
-        results.success.push({
-          studentId: data.studentId,
-          email: data.email,
-          temporaryPassword: tempPassword,
-        });
-      } catch (err) {
-        results.failed.push({ ...data, reason: err.message });
+    await auditService.logFromRequest(req, 'ADMIN_CREATED', {
+      targetType: 'User',
+      targetId: result.user._id,
+      metadata: {
+        createdRole: targetRole,
+        createdEmail: email
       }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `${targetRole} created successfully`,
+      data: result
+    });
+  } catch (error) {
+    console.error(`createAdminByRole (${targetRole}) error:`, error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to create admin'
+    });
+  }
+};
+
+// ============================================================
+// SUPER ADMIN — manage IT Admin
+// ============================================================
+const createITAdmin = (req, res) => createAdminByRole(req, res, 'it_admin');
+
+const getITAdmins = async (req, res) => {
+  try {
+    const admins = await adminService.listAdminsByRole('it_admin');
+    res.status(200).json({ success: true, count: admins.length, data: admins });
+  } catch (error) {
+    console.error('getITAdmins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list IT admins' });
+  }
+};
+
+// ============================================================
+// IT ADMIN — manage Department Admin & Registration Admin
+// ============================================================
+const createDepartmentAdmin = (req, res) =>
+  createAdminByRole(req, res, 'department_admin');
+
+const getDepartmentAdmins = async (req, res) => {
+  try {
+    const admins = await adminService.listAdminsByRole('department_admin');
+    res.status(200).json({ success: true, count: admins.length, data: admins });
+  } catch (error) {
+    console.error('getDepartmentAdmins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list department admins' });
+  }
+};
+
+const createRegistrationAdmin = (req, res) =>
+  createAdminByRole(req, res, 'registration_admin');
+
+const getRegistrationAdmins = async (req, res) => {
+  try {
+    const admins = await adminService.listAdminsByRole('registration_admin');
+    res.status(200).json({ success: true, count: admins.length, data: admins });
+  } catch (error) {
+    console.error('getRegistrationAdmins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list registration admins' });
+  }
+};
+
+// ============================================================
+// DEPARTMENT ADMIN — manage Class Admin
+// ============================================================
+const createClassAdmin = async (req, res) => {
+  try {
+    if (!adminService.canCreateRole(req.user.role, 'class_admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Department Admin can create Class Admin'
+      });
     }
+
+    const { displayName, email, classId } = req.body;
+
+    if (!displayName || !email || !classId) {
+      return res.status(400).json({
+        success: false,
+        message: 'displayName, email, and classId are required'
+      });
+    }
+
+    // Verify class belongs to the department admin's department
+    const Class = require('../models/Academic/Class');
+    const classObj = await Class.findById(classId);
+
+    if (!classObj) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
+    if (classObj.departmentId.toString() !== req.user.departmentId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Class does not belong to your department'
+      });
+    }
+
+    const result = await adminService.createAdminAccount({
+      displayName,
+      email,
+      role: 'class_admin',
+      scope: { classId },
+      createdBy: req.user._id
+    });
+
+    await auditService.logFromRequest(req, 'CLASS_ADMIN_CREATED', {
+      targetType: 'User',
+      targetId: result.user._id,
+      metadata: { classId, email }
+    });
 
     res.status(201).json({
       success: true,
-      message: `Bulk registration completed: ${results.success.length} succeeded, ${results.failed.length} failed`,
-      data: results,
+      message: 'Class Admin created successfully',
+      data: result
     });
   } catch (error) {
-    next(error);
+    console.error('createClassAdmin error:', error);
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
-/**
- * Admin get all students (with optional filters)
- * GET /api/admin/students
- */
-export const adminGetStudents = async (req, res, next) => {
+const getClassAdmins = async (req, res) => {
   try {
-    const { search, department, class: classFilter, academicYear, status, page = 1, limit = 20 } = req.query;
+    let filter = {};
+    // If department admin, filter to own department
+    if (req.user.role === 'department_admin') {
+      filter.departmentId = req.user.departmentId;
+    }
 
-    // Build filter
+    const admins = await adminService.listAdminsByRole('class_admin', filter);
+    res.status(200).json({ success: true, count: admins.length, data: admins });
+  } catch (error) {
+    console.error('getClassAdmins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list class admins' });
+  }
+};
+
+// ============================================================
+// Generic activate/deactivate
+// ============================================================
+const activateAdmin = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Check if the actor can manage this target
+    if (!adminService.canCreateRole(req.user.role, user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `You cannot manage a ${user.role}`
+      });
+    }
+
+    const updated = await adminService.setAdminActive(user._id, true, req.user._id);
+
+    await auditService.logFromRequest(req, 'ADMIN_ACTIVATED', {
+      targetType: 'User',
+      targetId: user._id,
+      metadata: { targetRole: user.role }
+    });
+
+    res.status(200).json({ success: true, message: 'Admin activated', data: updated });
+  } catch (error) {
+    console.error('activateAdmin error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+const deactivateAdmin = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Prevent self-deactivation
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot deactivate your own account'
+      });
+    }
+
+    if (!adminService.canCreateRole(req.user.role, user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `You cannot manage a ${user.role}`
+      });
+    }
+
+    const updated = await adminService.setAdminActive(user._id, false, req.user._id);
+
+    await auditService.logFromRequest(req, 'ADMIN_DEACTIVATED', {
+      targetType: 'User',
+      targetId: user._id,
+      metadata: { targetRole: user.role }
+    });
+
+    res.status(200).json({ success: true, message: 'Admin deactivated', data: updated });
+  } catch (error) {
+    console.error('deactivateAdmin error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================================
+// Reset password
+// ============================================================
+const resetAdminPasswordHandler = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!adminService.canCreateRole(req.user.role, user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `You cannot manage a ${user.role}`
+      });
+    }
+
+    const { user: updated, temporaryPassword } =
+      await adminService.resetAdminPassword(user._id, req.user._id);
+
+    await auditService.logFromRequest(req, 'ADMIN_PASSWORD_RESET', {
+      targetType: 'User',
+      targetId: user._id,
+      metadata: { targetRole: user.role }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+      data: {
+        userId: updated._id,
+        email: updated.email,
+        temporaryPassword
+      }
+    });
+  } catch (error) {
+    console.error('resetAdminPasswordHandler error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================================
+// Get single admin
+// ============================================================
+const getAdminById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .populate('collegeId', 'name code')
+      .populate('departmentId', 'name code')
+      .populate('academicLevelId', 'name code')
+      .populate('classId', 'name code')
+      .select('-password');
+
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error('getAdminById error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve admin' });
+  }
+};
+
+// ============================================================
+// Get all admins
+// ============================================================
+const getAllAdmins = async (req, res) => {
+  try {
+    const admins = await User.find({
+      role: { $in: ['super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'] }
+    })
+      .populate('collegeId', 'name code')
+      .populate('departmentId', 'name code')
+      .populate('classId', 'name code')
+      .select('-password')
+      .sort({ role: 1, createdAt: -1 });
+
+    res.status(200).json({ success: true, count: admins.length, data: admins });
+  } catch (error) {
+    console.error('getAllAdmins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list admins' });
+  }
+};
+
+// ============================================================
+// Audit log views
+// ============================================================
+const getAuditLogs = async (req, res) => {
+  try {
+    const { actorId, action, targetType, targetId, page = 1, limit = 50 } = req.query;
     const filter = {};
-    
-    if (search) {
-      filter.$or = [
-        { studentId: { $regex: search, $options: 'i' } },
-        { fullName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-      ];
-    }
+    if (actorId) filter.actorId = actorId;
+    if (action) filter.action = action;
+    if (targetType) filter.targetType = targetType;
+    if (targetId) filter.targetId = targetId;
 
-    if (department) {
-      filter.department = department;
-    }
-
-    if (classFilter) {
-      filter.class = classFilter;
-    }
-
-    if (academicYear) {
-      filter.academicYear = academicYear;
-    }
-
-    // If status filter is provided, we need to join with User
-    let students;
-    let total;
-
-    if (status) {
-      // Find users with the given status
-      const users = await User.find({ 
-        role: ROLES.STUDENT,
-        isActive: status === 'active' 
-      }).select('studentId');
-      
-      const studentIds = users.map(u => u.studentId);
-      filter.studentId = { $in: studentIds };
-    }
-
-    const skip = (page - 1) * limit;
-
-    students = await Student.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    total = await Student.countDocuments(filter);
-
-    // Get account status for each student
-    const studentsWithStatus = await Promise.all(
-      students.map(async (student) => {
-        const user = await User.findOne({ studentId: student.studentId }).select('isActive mustChangePassword lastLogin');
-        return {
-          ...student.toObject(),
-          account: user || null,
-        };
-      })
-    );
-
-    res.status(200).json({
-      success: true,
-      data: studentsWithStatus,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
+    const result = await auditService.getLogs(filter, { page, limit });
+    res.status(200).json({ success: true, ...result });
   } catch (error) {
-    next(error);
+    console.error('getAuditLogs error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve audit logs' });
   }
 };
 
-/**
- * Admin get single student
- * GET /api/admin/students/:studentId
- */
-export const adminGetStudent = async (req, res, next) => {
-  try {
-    const { studentId } = req.params;
-
-    const student = await Student.findOne({ studentId });
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student not found',
-      });
-    }
-
-    // Get the associated user account
-    const user = await User.findOne({ studentId }).select('-password -resetPasswordToken -resetPasswordExpire');
-
-    res.status(200).json({
-      success: true,
-      data: {
-        student,
-        account: user,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Admin reset password (uses Name+ID rule)
- * POST /api/admin/students/:studentId/reset-password
- */
-export const resetPassword = async (req, res, next) => {
-  try {
-    const { studentId } = req.params;
-
-    const user = await User.findOne({ studentId });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student user not found',
-      });
-    }
-
-    const student = await Student.findOne({ studentId });
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student record not found',
-      });
-    }
-
-    const tempPassword = generatePasswordFromNameAndId(student.fullName, student.studentId);
-    const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
-    const hashedPassword = await bcrypt.hash(tempPassword, salt);
-
-    user.password = hashedPassword;
-    user.mustChangePassword = true;
-    user.passwordChangedAt = new Date();
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Password reset successful',
-      data: {
-        studentId: user.studentId,
-        email: user.email,
-        temporaryPassword: tempPassword,
-        mustChangePassword: true,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Admin activate student account
- * PATCH /api/admin/students/:studentId/activate
- */
-export const activateStudent = async (req, res, next) => {
-  try {
-    const { studentId } = req.params;
-    const user = await User.findOne({ studentId });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student user not found',
-      });
-    }
-
-    if (user.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: 'Account is already active',
-      });
-    }
-
-    user.isActive = true;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Account activated successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Admin deactivate student account
- * PATCH /api/admin/students/:studentId/deactivate
- */
-export const deactivateStudent = async (req, res, next) => {
-  try {
-    const { studentId } = req.params;
-    const user = await User.findOne({ studentId });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student user not found',
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: 'Account is already inactive',
-      });
-    }
-
-    user.isActive = false;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Account deactivated successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
+module.exports = {
+  createITAdmin,
+  getITAdmins,
+  createDepartmentAdmin,
+  getDepartmentAdmins,
+  createRegistrationAdmin,
+  getRegistrationAdmins,
+  createClassAdmin,
+  getClassAdmins,
+  activateAdmin,
+  deactivateAdmin,
+  resetAdminPassword: resetAdminPasswordHandler,
+  getAdminById,
+  getAllAdmins,
+  getAuditLogs
 };
