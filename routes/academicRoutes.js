@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
+
+// Middleware
+const { protect } = require('../middleware/authMiddleware');
 const { requireRoles } = require('../middleware/roleMiddleware');
 const { requirePermission } = require('../middleware/permissionMiddleware');
 const { requireScope } = require('../middleware/scopeMiddleware');
 
+// Controllers
 const {
   // College
   createCollege, getColleges, getCollege, updateCollege, deleteCollege,
@@ -24,72 +28,340 @@ const {
 const cohortController = require('../controllers/academic/cohortController');
 const assessmentComponentController = require('../controllers/academic/assessmentComponentController');
 
-const { protect } = require('../middleware/authMiddleware');
-const { adminOnly } = require('../middleware/roleMiddleware');
+// ============================================================
+// ALL academic routes require authentication
+// ============================================================
+router.use(protect);
 
-router.use(protect, adminOnly);
+// ============================================================
+// COLLEGE — Super Admin only
+// ============================================================
+router.post(
+  '/colleges',
+  requireRoles('super_admin'),
+  requirePermission('create_college'),
+  createCollege
+);
 
-// COLLEGE
-router.post('/colleges', createCollege);
-router.get('/colleges', getColleges);
-router.get('/colleges/:id', getCollege);
-router.patch('/colleges/:id', updateCollege);
-router.delete('/colleges/:id', deleteCollege);
+router.get(
+  '/colleges',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getColleges
+);
 
-// DEPARTMENT
-router.post('/departments', createDepartment);
-router.get('/departments', getDepartments);
-router.get('/departments/:id', getDepartment);
-router.patch('/departments/:id', updateDepartment);
-router.delete('/departments/:id', deleteDepartment);
+router.get(
+  '/colleges/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getCollege
+);
 
-// ACADEMIC LEVEL
-router.post('/academic-levels', createAcademicLevel);
-router.get('/academic-levels', getAcademicLevels);
-router.get('/academic-levels/:id', getAcademicLevel);
-router.patch('/academic-levels/:id', updateAcademicLevel);
-router.delete('/academic-levels/:id', deleteAcademicLevel);
+router.patch(
+  '/colleges/:id',
+  requireRoles('super_admin'),
+  requirePermission('manage_college'),
+  updateCollege
+);
 
-// ACADEMIC PERIOD
-router.post('/academic-periods', createAcademicPeriod);
-router.get('/academic-periods', getAcademicPeriods);
-router.get('/academic-periods/:id', getAcademicPeriod);
-router.patch('/academic-periods/:id', updateAcademicPeriod);
-router.delete('/academic-periods/:id', deleteAcademicPeriod);
+router.delete(
+  '/colleges/:id',
+  requireRoles('super_admin'),
+  requirePermission('manage_college'),
+  deleteCollege
+);
 
-// CLASS
-router.post('/classes', createClass);
-router.get('/classes', getClasses);
-router.get('/classes/:id', getClass);
-router.patch('/classes/:id', updateClass);
-router.delete('/classes/:id', deleteClass);
+// ============================================================
+// DEPARTMENT — Super Admin only
+// ============================================================
+router.post(
+  '/departments',
+  requireRoles('super_admin'),
+  requirePermission('create_department'),
+  createDepartment
+);
 
-// COHORT (NEW)
-router.post('/cohorts', cohortController.createCohort);
-router.get('/cohorts', cohortController.getCohorts);
-router.get('/cohorts/:id', cohortController.getCohort);
-router.patch('/cohorts/:id', cohortController.updateCohort);
-router.delete('/cohorts/:id', cohortController.deleteCohort);
+router.get(
+  '/departments',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getDepartments
+);
 
-// MODULE
-router.post('/modules', createModule);
-router.get('/modules', getModules);
-router.get('/modules/:id', getModule);
-router.patch('/modules/:id', updateModule);
-router.delete('/modules/:id', deleteModule);
+router.get(
+  '/departments/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getDepartment
+);
 
-// SUBJECT
-router.post('/subjects', createSubject);
-router.get('/subjects', getSubjects);
-router.get('/subjects/:id', getSubject);
-router.patch('/subjects/:id', updateSubject);
-router.delete('/subjects/:id', deleteSubject);
+router.patch(
+  '/departments/:id',
+  requireRoles('super_admin'),
+  requirePermission('manage_department'),
+  updateDepartment
+);
 
-// ASSESSMENT COMPONENT (NEW)
-router.post('/assessment-components', assessmentComponentController.createAssessmentComponent);
-router.get('/assessment-components', assessmentComponentController.getAssessmentComponents);
-router.get('/assessment-components/:id', assessmentComponentController.getAssessmentComponent);
-router.patch('/assessment-components/:id', assessmentComponentController.updateAssessmentComponent);
-router.delete('/assessment-components/:id', assessmentComponentController.deleteAssessmentComponent);
+router.delete(
+  '/departments/:id',
+  requireRoles('super_admin'),
+  requirePermission('manage_department'),
+  deleteDepartment
+);
+
+// ============================================================
+// ACADEMIC LEVEL — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/academic-levels',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_academic_level'),
+  requireScope('department'),
+  createAcademicLevel
+);
+
+router.get(
+  '/academic-levels',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getAcademicLevels
+);
+
+router.get(
+  '/academic-levels/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getAcademicLevel
+);
+
+router.patch(
+  '/academic-levels/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_academic_level'),
+  updateAcademicLevel
+);
+
+router.delete(
+  '/academic-levels/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_academic_level'),
+  deleteAcademicLevel
+);
+
+// ============================================================
+// ACADEMIC PERIOD — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/academic-periods',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_academic_period'),
+  requireScope('department'),
+  createAcademicPeriod
+);
+
+router.get(
+  '/academic-periods',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getAcademicPeriods
+);
+
+router.get(
+  '/academic-periods/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getAcademicPeriod
+);
+
+router.patch(
+  '/academic-periods/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_academic_period'),
+  updateAcademicPeriod
+);
+
+router.delete(
+  '/academic-periods/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_academic_period'),
+  deleteAcademicPeriod
+);
+
+// ============================================================
+// CLASS — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/classes',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_class'),
+  requireScope('department'),
+  createClass
+);
+
+router.get(
+  '/classes',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getClasses
+);
+
+router.get(
+  '/classes/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getClass
+);
+
+router.patch(
+  '/classes/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_class'),
+  updateClass
+);
+
+router.delete(
+  '/classes/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_class'),
+  deleteClass
+);
+
+// ============================================================
+// COHORT — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/cohorts',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_cohort'),
+  requireScope('department'),
+  cohortController.createCohort
+);
+
+router.get(
+  '/cohorts',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  cohortController.getCohorts
+);
+
+router.get(
+  '/cohorts/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  cohortController.getCohort
+);
+
+router.patch(
+  '/cohorts/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_cohort'),
+  cohortController.updateCohort
+);
+
+router.delete(
+  '/cohorts/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_cohort'),
+  cohortController.deleteCohort
+);
+
+// ============================================================
+// MODULE — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/modules',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_module'),
+  requireScope('department'),
+  createModule
+);
+
+router.get(
+  '/modules',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getModules
+);
+
+router.get(
+  '/modules/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getModule
+);
+
+router.patch(
+  '/modules/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_module'),
+  updateModule
+);
+
+router.delete(
+  '/modules/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_module'),
+  deleteModule
+);
+
+// ============================================================
+// SUBJECT — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/subjects',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_subject'),
+  requireScope('department'),
+  createSubject
+);
+
+router.get(
+  '/subjects',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getSubjects
+);
+
+router.get(
+  '/subjects/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  getSubject
+);
+
+router.patch(
+  '/subjects/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_subject'),
+  updateSubject
+);
+
+router.delete(
+  '/subjects/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_subject'),
+  deleteSubject
+);
+
+// ============================================================
+// ASSESSMENT COMPONENT — Department Admin (own department) + Super Admin
+// ============================================================
+router.post(
+  '/assessment-components',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_module'),
+  requireScope('department'),
+  assessmentComponentController.createAssessmentComponent
+);
+
+router.get(
+  '/assessment-components',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  assessmentComponentController.getAssessmentComponents
+);
+
+router.get(
+  '/assessment-components/:id',
+  requireRoles('super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'),
+  assessmentComponentController.getAssessmentComponent
+);
+
+router.patch(
+  '/assessment-components/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_module'),
+  assessmentComponentController.updateAssessmentComponent
+);
+
+router.delete(
+  '/assessment-components/:id',
+  requireRoles('super_admin', 'department_admin'),
+  requirePermission('manage_module'),
+  assessmentComponentController.deleteAssessmentComponent
+);
 
 module.exports = router;

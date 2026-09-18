@@ -7,11 +7,15 @@ const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 
 // Import routes
+// ============================================================
+// ROUTE IMPORTS
+// ============================================================
 const authRoutes = require('./routes/authRoutes');
-const studentRoutes = require('./routes/studentRoutes');
-const academicRoutes = require('./routes/academicRoutes');
-const resultRoutes = require('./routes/resultRoutes');
-const studentAdminRoutes = require('./routes/studentAdminRoutes');
+const adminRoutes = require('./routes/adminRoutes');                    // Admin Management (accounts)
+const studentAdminRoutes = require('./routes/studentAdminRoutes');      // Student Management (admin)
+const studentRoutes = require('./routes/studentRoutes');                // Student Self-Service
+const academicRoutes = require('./routes/academicRoutes');              // Academic Structure
+const resultRoutes = require('./routes/resultRoutes');                  // Result Management
 
 const app = express();
 

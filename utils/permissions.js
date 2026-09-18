@@ -111,7 +111,10 @@ const PERMISSIONS = {
     'view_class_students',
     'view_class_results',
     'upload_class_results',
-    'manage_class_attendance'
+    'manage_class_attendance',
+
+    'manage_results',
+    'release_results',
   ],
 
   // ============================================================

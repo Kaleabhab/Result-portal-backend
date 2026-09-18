@@ -13,6 +13,33 @@ const generateTemporaryPassword = (firstName, lastName, studentId) => {
   return `${firstInitial}${lastInitial}${studentId}`;
 };
 
+
+
+
+
+const auditLogService = require('../services/auditLogService');
+// OR inline audit:
+const AuditLog = require('../models/AuditLog');
+
+const audit = async (req, action, options = {}) => {
+  try {
+    await AuditLog.create({
+      actorId: req.user._id,
+      actorRole: req.user.role,
+      actorEmail: req.user.email,
+      action,
+      targetType: options.targetType,
+      targetId: options.targetId,
+      ipAddress: req.ip,
+      userAgent: req.get?.('user-agent'),
+      metadata: options.metadata || {},
+      description: options.description
+    });
+  } catch (err) {
+    console.error('Audit log error:', err);
+  }
+};
+
 // @desc    Register a single student
 // @route   POST /api/students/admin/register
 // @access  Private (Admin only)
