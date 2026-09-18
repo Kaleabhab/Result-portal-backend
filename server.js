@@ -11,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const academicRoutes = require('./routes/academicRoutes');
 const resultRoutes = require('./routes/resultRoutes');
+const studentAdminRoutes = require('./routes/studentAdminRoutes');
 
 const app = express();
 
@@ -41,7 +42,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/admin/academic', academicRoutes);
+// Mount at /api/admin/manage — won't clash with student admin at /api/admin
+app.use('/api/admin/manage', adminRoutes);
 app.use('/api/results', resultRoutes);
+// Student Management (admin-facing)
+app.use('/api/admin/students', studentAdminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

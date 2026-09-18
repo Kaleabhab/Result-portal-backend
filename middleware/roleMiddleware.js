@@ -1,109 +1,88 @@
-
 /**
- * Role Middleware
- * Checks if the authenticated user has the required role
+ * Role Middleware — reusable across the whole project
  */
 
-// ============================================================
-// requireRole — Single role check
-// ============================================================
-const requireRole = (role) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
+const sendAuthError = (res) =>
+  res.status(401).json({ success: false, message: 'Authentication required' });
 
-    if (req.user.role !== role) {
-      return res.status(403).json({
-        success: false,
-        message: `Access denied. Required role: ${role}`
-      });
-    }
+const sendRoleError = (res, label) =>
+  res.status(403).json({ success: false, message: `${label} access only` });
 
-    next();
-  };
+// Individual guards
+const superAdminOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== 'super_admin') return sendRoleError(res, 'Super Admin');
+  next();
 };
 
-// ============================================================
-// requireRoles — Multiple role check (any of them)
-// ============================================================
-const requireRoles = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `Access denied. Required one of: ${roles.join(', ')}`
-      });
-    }
-
-    next();
-  };
+const itAdminOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== 'it_admin') return sendRoleError(res, 'IT Admin');
+  next();
 };
-// ============================================================
-// Convenience middleware
-// ============================================================
 
-const adminOnly = requireRoles(
-  'super_admin',
-  'it_admin',
-  'department_admin',
-  'registration_admin',
-  'class_admin'
-);
+const departmentAdminOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== 'department_admin') return sendRoleError(res, 'Department Admin');
+  next();
+};
 
-const studentOnly = requireRole('student');
+const registrationAdminOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== 'registration_admin') return sendRoleError(res, 'Registration Admin');
+  next();
+};
 
-const superAdminOnly = requireRole('super_admin');
-const itAdminOnly = requireRole('it_admin');
+const classAdminOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== 'class_admin') return sendRoleError(res, 'Class Admin');
+  next();
+};
 
-const departmentAdminOnly = requireRole('department_admin');
+const studentOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== 'student') return sendRoleError(res, 'Student');
+  next();
+};
 
-const registrationAdminOnly = requireRole('registration_admin');
+// Any admin (all 5)
+const anyAdminOnly = (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  const adminRoles = ['super_admin', 'it_admin', 'department_admin', 'registration_admin', 'class_admin'];
+  if (!adminRoles.includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Admin access only' });
+  }
+  next();
+};
 
-const classAdminOnly = requireRole('class_admin');
+// Factory
+const requireRole = (role) => (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (req.user.role !== role) {
+    return res.status(403).json({ success: false, message: `Access denied. Required role: ${role}` });
+  }
+  next();
+};
 
-
-
-// ============================================================
-// Allow admin OR the specific student (owner check happens later)
-// ============================================================
-const adminOrStudent = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
+const requireRoles = (...roles) => (req, res, next) => {
+  if (!req.user) return sendAuthError(res);
+  if (!roles.includes(req.user.role)) {
+    return res.status(403).json({
       success: false,
-      message: 'Authentication required'
+      message: `Access denied. Required: ${roles.join(' or ')}`
     });
   }
-
-  if (req.user.role === 'student' || req.user.isAdmin()) {
-    return next();
-  }
-
-  return res.status(403).json({
-    success: false,
-    message: 'Access denied'
-  });
+  next();
 };
 
 module.exports = {
-  requireRole,
-  requireRoles,
-  adminOnly,
-  studentOnly,
   superAdminOnly,
   itAdminOnly,
   departmentAdminOnly,
   registrationAdminOnly,
   classAdminOnly,
-  adminOrStudent
+  studentOnly,
+  anyAdminOnly,
+  requireRole,
+  requireRoles
 };

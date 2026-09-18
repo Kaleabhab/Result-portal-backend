@@ -1,74 +1,142 @@
 /**
- * Permissions utility
- * Maps role → permission list, and provides helpers
+ * Master Permission Map
+ * Every role → every action it can perform.
+ * Admin Management uses this now.
+ * Student / Academic / Result modules will use this later.
  */
 
 const PERMISSIONS = {
+
+  // ============================================================
+  // SUPER ADMIN — global governance
+  // ============================================================
   super_admin: [
+    // Admin Management
     'manage_it_admin',
-    'manage_audit_logs',
+    'manage_department_admin',
+    'manage_registration_admin',
+    'manage_class_admin',
     'view_all_admins',
     'manage_admin_permissions',
     'manage_admin_scope',
-    'global_oversight'
-  ],
+    'manage_audit_logs',
+    'global_oversight',
 
-  it_admin: [
-    'manage_department_admin',
-    'manage_registration_admin',
+    // Top-level academic structure
+    'create_college',
+    'manage_college',
+    'create_department',
+    'manage_department',
+    'manage_academic_structure',
+
+    // Student lifecycle (override)
+    'register_student',
+    'bulk_register_student',
+    'manage_student',
+    'view_students',
+    'withdraw_student',
+    'reactivate_student',
+    'transfer_student',
+
+    // Results (override)
+    'manage_results',
+    'release_results',
+
+    // System
     'system_configuration',
     'database_maintenance',
+    'backup_recovery',
+    'technical_monitoring'
+  ],
+
+  // ============================================================
+  // IT ADMIN — technical + account management
+  // ============================================================
+  it_admin: [
+    // Account management (its scope)
+    'manage_department_admin',
+    'manage_registration_admin',
+
+    // Technical system
+    'system_configuration',
+    'server_application_configuration',
+    'database_maintenance',
+    'authentication_infrastructure',
+    'security_configuration',
     'backup_recovery',
     'technical_monitoring',
     'system_health',
     'integration_configuration',
     'email_system_configuration',
-    'technical_access_configuration',
-    'authentication_infrastructure',
-    'security_configuration',
-    'server_application_configuration'
+    'technical_access_configuration'
   ],
 
+  // ============================================================
+  // DEPARTMENT ADMIN — department academic + class admins
+  // ============================================================
   department_admin: [
-    'manage_class_admin'
+    // Account management
+    'manage_class_admin',
+
+    // Academic structure (within own department)
+    'manage_academic_level',
+    'manage_class',
+    'manage_academic_period',
+    'manage_module',
+    'manage_subject',
+    'manage_cohort',
+
+    // View (department scope)
+    'view_department_students',
+    'view_department_results'
   ],
 
-  registration_admin: [],
+  // ============================================================
+  // REGISTRATION ADMIN — student lifecycle
+  // ============================================================
+  registration_admin: [
+    'register_student',
+    'bulk_register_student',
+    'manage_student',
+    'view_students',
+    'withdraw_student',
+    'reactivate_student',
+    'transfer_student'
+  ],
 
-  class_admin: [],
+  // ============================================================
+  // CLASS ADMIN — assigned class only
+  // ============================================================
+  class_admin: [
+    'view_class_students',
+    'view_class_results',
+    'upload_class_results',
+    'manage_class_attendance'
+  ],
 
-  student: []
+  // ============================================================
+  // STUDENT — own data only
+  // ============================================================
+  student: [
+    'view_own_profile',
+    'update_own_profile',
+    'view_own_results'
+  ]
 };
 
 // ============================================================
-// Get all permissions for a role
+// Helpers
 // ============================================================
-const getPermissionsForRole = (role) => {
-  return PERMISSIONS[role] || [];
-};
+const getPermissionsForRole = (role) => PERMISSIONS[role] || [];
 
-// ============================================================
-// Check if a role has a permission
-// ============================================================
-const roleHasPermission = (role, permission) => {
-  return getPermissionsForRole(role).includes(permission);
-};
+const roleHasPermission = (role, permission) =>
+  getPermissionsForRole(role).includes(permission);
 
-// ============================================================
-// Check if a role has any of the given permissions
-// ============================================================
-const roleHasAnyPermission = (role, permissions) => {
-  return permissions.some((p) => roleHasPermission(role, p));
-};
+const roleHasAnyPermission = (role, permissions) =>
+  permissions.some((p) => roleHasPermission(role, p));
 
-// ============================================================
-// Get all roles that have a permission
-// ============================================================
-const getRolesWithPermission = (permission) => {
-  return Object.keys(PERMISSIONS).filter((role) =>
-    roleHasPermission(role, permission)
-  );
-};
+const getRolesWithPermission = (permission) =>
+  Object.keys(PERMISSIONS).filter((role) => roleHasPermission(role, permission));
 
 module.exports = {
   PERMISSIONS,

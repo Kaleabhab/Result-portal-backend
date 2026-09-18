@@ -1,70 +1,41 @@
 const express = require('express');
 const router = express.Router();
+
+// Controller
 const {
-  registerStudent,
-  bulkRegisterStudents,
-  adminGetStudents,
-  adminGetStudent,
   getMyProfile,
   updateMyProfile,
-  activateStudent,
-  deactivateStudent
-} = require('../controllers/studentController');
-const {
-  registrationAdminOnly,
-  superAdminOnly,
-  requireRoles
-} = require('../middleware/roleMiddleware');
+} = require('../controllers/studentAdminController');
 
-const { requirePermission } = require('../middleware/permissionMiddleware');
+// Middleware
 const { protect } = require('../middleware/authMiddleware');
-const { adminOnly, studentOnly } = require('../middleware/roleMiddleware');
+const { studentOnly } = require('../middleware/roleMiddleware');
+const { requirePermission } = require('../middleware/permissionMiddleware');
 
-// Student-facing routes
-router.get('/me', protect, studentOnly, getMyProfile);
-router.patch('/me', protect, studentOnly, updateMyProfile);
+// ============================================================
+// ALL routes require authentication + student role
+// ============================================================
+router.use(protect);
+router.use(studentOnly);
 
-// Admin-only routes
-router.post(
-  '/admin/register',
-  protect,
-  requireRoles('registration_admin', 'super_admin'),
-  requirePermission('register_student'),
-  registerStudent
-);
-router.post(
-  '/admin/bulk-register',
-  protect,
-  requireRoles('registration_admin', 'super_admin'),
-  requirePermission('bulk_register_student'),
-  bulkRegisterStudents
-);
+// ============================================================
+// GET /api/students/me
+// Get own profile
+// ============================================================
 router.get(
-  '/admin/:studentId',
-  protect,
-  requireRoles('registration_admin', 'super_admin'),
-  requirePermission('view_students'),
-  adminGetStudent
-);
-router.patch(
-  '/admin/:studentId/activate',
-  protect,
-  requireRoles('registration_admin', 'super_admin'),
-  requirePermission('reactivate_student'),
-  activateStudent
+  '/me',
+  requirePermission('view_own_profile'),
+  getMyProfile
 );
 
+// ============================================================
+// PATCH /api/students/me
+// Update own profile (limited fields)
+// ============================================================
 router.patch(
-  '/admin/:studentId/deactivate',
-  protect,
-  requireRoles('registration_admin', 'super_admin'),
-  requirePermission('withdraw_student'),
-  deactivateStudent
+  '/me',
+  requirePermission('update_own_profile'),
+  updateMyProfile
 );
-//router.post('/admin/bulk-register', protect, adminOnly, bulkRegisterStudents);
-//router.get('/admin', protect, adminOnly, adminGetStudents);
-//router.get('/admin/:studentId', protect, adminOnly, adminGetStudent);
-//router.patch('/admin/:studentId/activate', protect, adminOnly, activateStudent);
-//router.patch('/admin/:studentId/deactivate', protect, adminOnly, deactivateStudent);
 
 module.exports = router;
