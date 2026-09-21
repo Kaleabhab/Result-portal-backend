@@ -10,12 +10,14 @@ const rateLimit = require('express-rate-limit');
 // ============================================================
 // ROUTE IMPORTS
 // ============================================================
-const authRoutes = require('./routes/authRoutes');
-const adminRoutes = require('./routes/adminRoutes');                    // Admin Management (accounts)
-const studentAdminRoutes = require('./routes/studentAdminRoutes');      // Student Management (admin)
-const studentRoutes = require('./routes/studentRoutes');                // Student Self-Service
-const academicRoutes = require('./routes/academicRoutes');              // Academic Structure
-const resultRoutes = require('./routes/resultRoutes');                  // Result Management
+const authRoutes             = require('./routes/authRoutes');
+const adminRoutes            = require('./routes/adminRoutes');
+const academicRoutes         = require('./routes/academicRoutes');
+const studentAdminRoutes     = require('./routes/studentAdminRoutes');
+const studentRoutes          = require('./routes/studentRoutes');
+const departmentAdminRoutes  = require('./routes/departmentAdminRoutes');
+const classAdminRoutes       = require('./routes/classAdminRoutes');
+const resultRoutes           = require('./routes/resultRoutes');
 
 const app = express();
 
@@ -42,15 +44,14 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/students', studentRoutes);
-app.use('/api/admin/academic', academicRoutes);
-// Mount at /api/admin/manage — won't clash with student admin at /api/admin
-app.use('/api/admin/manage', adminRoutes);
-app.use('/api/results', resultRoutes);
-// Student Management (admin-facing)
-app.use('/api/admin/students', studentAdminRoutes);
+app.use('/api/auth',               authRoutes);
+app.use('/api/admin/manage',       adminRoutes);
+app.use('/api/admin/academic',     academicRoutes);
+app.use('/api/admin/students',     studentAdminRoutes);
+app.use('/api/students',           studentRoutes);
+app.use('/api/department-admin',   departmentAdminRoutes);   // ← present
+app.use('/api/class-admin',        classAdminRoutes);        // ← present
+app.use('/api/results',            resultRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

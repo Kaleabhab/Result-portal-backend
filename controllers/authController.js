@@ -54,7 +54,7 @@ const login = async (req, res) => {
 
 
     // After failed password match
-    const auditService = require('../services/auditLogService');
+    //const auditService = require('../services/auditLogService');
     await auditService.log({
       actorId: user._id,
       actorRole: user.role,

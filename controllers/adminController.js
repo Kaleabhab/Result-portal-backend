@@ -5,6 +5,8 @@
 const User = require('../models/User');
 const Class = require('../models/Academic/Class');
 const AcademicLevel = require('../models/Academic/AcademicLevel');
+const ClassAdminApproval = require('../models/ClassAdminApproval');
+const AcademicPeriod = require('../models/Academic/AcademicPeriod');
 const Department = require('../models/Academic/Department');
 const College = require('../models/Academic/College');
 const AuditLog = require('../models/AuditLog');
@@ -472,6 +474,164 @@ const emailSystemConfiguration = makeStub(AUDIT_ACTIONS.EMAIL_SYSTEM_CONFIGURATI
 const technicalAccessConfiguration = makeStub(AUDIT_ACTIONS.TECHNICAL_ACCESS_CONFIGURATION);
 
 // ============================================================
+// CLASS ADMIN APPROVAL MANAGEMENT (Department Admin only)
+// ============================================================
+
+// @desc    List all class admin approvals in own department
+// @route   GET /api/admin/manage/class-approvals
+const listApprovals = async (req, res) => {
+  try {
+    const { status, classId, classAdminId } = req.query;
+
+    const levels = await AcademicLevel.find({ departmentId: req.user.departmentId }).select('_id');
+    const levelIds = levels.map((l) => l._id);
+    const classes = await Class.find({ academicLevelId: { $in: levelIds } }).select('_id');
+    const classIds = classes.map((c) => c._id);
+
+    const query = { classId: { $in: classIds } };
+    if (status) query.status = status;
+    if (classId) query.classId = classId;
+    if (classAdminId) query.classAdminId = classAdminId;
+
+    const approvals = await ClassAdminApproval.find(query)
+      .populate('classAdminId', 'displayName email')
+      .populate('classId', 'name code')
+      .populate('academicLevelId', 'name code order')
+      .populate('academicPeriodId', 'name code order')
+      .populate('cohortId', 'name code admissionYear')
+      .populate('approvedBy', 'displayName email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: approvals.length, data: approvals });
+  } catch (error) {
+    console.error('listApprovals error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list approvals' });
+  }
+};
+
+// @desc    Create approval
+// @route   POST /api/admin/manage/class-approvals
+const createApproval = async (req, res) => {
+  try {
+    const { classAdminId, classId, academicLevelId, academicPeriodId, cohortId, notes } = req.body;
+
+    if (!classAdminId || !classId || !academicLevelId || !academicPeriodId) {
+      return res.status(400).json({
+        success: false,
+        message: 'classAdminId, classId, academicLevelId, academicPeriodId are required'
+      });
+    }
+
+    const classAdmin = await User.findById(classAdminId);
+    if (!classAdmin || classAdmin.role !== 'class_admin') {
+      return res.status(404).json({ success: false, message: 'Class Admin not found' });
+    }
+
+    if (!classAdmin.departmentId || classAdmin.departmentId.toString() !== req.user.departmentId.toString()) {
+      return res.status(403).json({ success: false, message: 'Class Admin is not in your department' });
+    }
+
+    const classObj = await Class.findById(classId);
+    if (!classObj) return res.status(404).json({ success: false, message: 'Class not found' });
+    if (classObj.departmentId.toString() !== req.user.departmentId.toString()) {
+      return res.status(403).json({ success: false, message: 'Class is not in your department' });
+    }
+
+    const level = await AcademicLevel.findById(academicLevelId);
+    if (!level || level.departmentId.toString() !== req.user.departmentId.toString()) {
+      return res.status(403).json({ success: false, message: 'Academic level is not in your department' });
+    }
+
+    const period = await AcademicPeriod.findById(academicPeriodId);
+    if (!period || period.academicLevelId.toString() !== academicLevelId) {
+      return res.status(400).json({ success: false, message: 'Academic period does not belong to level' });
+    }
+
+    const existing = await ClassAdminApproval.findOne({
+      classAdminId, classId, academicPeriodId, status: 'ACTIVE'
+    });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Active approval already exists for this cycle' });
+    }
+
+    const approval = await ClassAdminApproval.create({
+      classAdminId, classId, academicLevelId, academicPeriodId,
+      cohortId: cohortId || null,
+      approvedBy: req.user._id,
+      status: 'ACTIVE',
+      notes
+    });
+
+    await audit(req, 'CLASS_ADMIN_APPROVED', {
+      targetType: 'ClassAdminApproval',
+      targetId: approval._id,
+      metadata: { classAdminId, classId, academicLevelId, academicPeriodId }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Class Admin approved for this academic cycle',
+      data: approval
+    });
+  } catch (error) {
+    console.error('createApproval error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Revoke approval
+// @route   PATCH /api/admin/manage/class-approvals/:id/revoke
+const revokeApproval = async (req, res) => {
+  try {
+    const approval = await ClassAdminApproval.findById(req.params.id);
+    if (!approval) return res.status(404).json({ success: false, message: 'Approval not found' });
+
+    const classObj = await Class.findById(approval.classId);
+    if (!classObj || classObj.departmentId.toString() !== req.user.departmentId.toString()) {
+      return res.status(403).json({ success: false, message: 'Approval is not in your department' });
+    }
+
+    approval.status = 'REVOKED';
+    approval.revokedBy = req.user._id;
+    approval.revokedAt = new Date();
+    if (req.body.notes) approval.notes = req.body.notes;
+    await approval.save();
+
+    await audit(req, 'CLASS_ADMIN_APPROVAL_REVOKED', {
+      targetType: 'ClassAdminApproval',
+      targetId: approval._id
+    });
+
+    res.status(200).json({ success: true, message: 'Approval revoked', data: approval });
+  } catch (error) {
+    console.error('revokeApproval error:', error);
+    res.status(500).json({ success: false, message: 'Failed to revoke approval' });
+  }
+};
+
+// @desc    Get single approval
+// @route   GET /api/admin/manage/class-approvals/:id
+const getApproval = async (req, res) => {
+  try {
+    const approval = await ClassAdminApproval.findById(req.params.id)
+      .populate('classAdminId', 'displayName email')
+      .populate('classId', 'name code')
+      .populate('academicLevelId', 'name code order')
+      .populate('academicPeriodId', 'name code order')
+      .populate('cohortId', 'name code admissionYear')
+      .populate('approvedBy', 'displayName email')
+      .populate('revokedBy', 'displayName email');
+
+    if (!approval) return res.status(404).json({ success: false, message: 'Approval not found' });
+
+    res.status(200).json({ success: true, data: approval });
+  } catch (error) {
+    console.error('getApproval error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve approval' });
+  }
+};
+
+// ============================================================
 // EXPORTS
 // ============================================================
 module.exports = {
@@ -498,5 +658,11 @@ module.exports = {
   systemConfiguration, serverApplicationConfiguration, databaseMaintenance,
   authenticationInfrastructure, securityConfiguration, backupRecovery,
   technicalMonitoring, systemHealth, integrationConfiguration,
-  emailSystemConfiguration, technicalAccessConfiguration
+  emailSystemConfiguration, technicalAccessConfiguration,
+
+  // Class Admin Approval
+  listApprovals,
+  createApproval,
+  revokeApproval,
+  getApproval
 };

@@ -12,12 +12,15 @@ const AcademicPeriod = require('../../models/Academic/AcademicPeriod');
 const Department = require('../../models/Academic/Department');
 const Subject = require('../../models/Academic/Subject');
 const AssessmentComponent = require('../../models/Academic/AssessmentComponent');
+const ClassAdminApproval = require('../../models/ClassAdminApproval');
+const Class = require('../../models/Academic/Class');
 
 const resultValidationService = require('../../services/results/resultValidationService');
 const resultCalculationService = require('../../services/results/resultCalculationService');
 const gradingService = require('../../services/results/gradingService');
 const auditLogService = require('../../services/results/auditLogService');
 const reExamService = require('../../services/results/reExamService');
+
 
 // ============================================================
 // @desc    Create a single result
@@ -735,6 +738,131 @@ const tryRecalculateModuleResult = async (studentId, moduleId, userId) => {
   }
 };
 
+// ============================================================
+// DEPARTMENT ADMIN — RESULT VIEWS
+// (merged from departmentAdmin/resultController.js)
+// ============================================================
+
+// @desc    Get all results in own department
+// @route   GET /api/department-admin/results
+const getDepartmentResults = async (req, res) => {
+  try {
+    const levels = await AcademicLevel.find({ departmentId: req.user.departmentId }).select('_id');
+    const levelIds = levels.map((l) => l._id);
+
+    const students = await Student.find({ academicLevelId: { $in: levelIds } }).select('_id');
+    const studentIds = students.map((s) => s._id);
+
+    const results = await Result.find({ studentId: { $in: studentIds } })
+      .populate('moduleId', 'name code')
+      .populate('studentId', 'studentId displayName')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: results.length, data: results });
+  } catch (error) {
+    console.error('getDepartmentResults error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve department results' });
+  }
+};
+
+// @desc    Get results for a specific class in own department
+// @route   GET /api/department-admin/results/class/:classId
+const getDepartmentClassResults = async (req, res) => {
+  try {
+    const classObj = await Class.findById(req.params.classId);
+    if (!classObj) return res.status(404).json({ success: false, message: 'Class not found' });
+    if (classObj.departmentId.toString() !== req.user.departmentId.toString()) {
+      return res.status(403).json({ success: false, message: 'Class is not in your department' });
+    }
+
+    const students = await Student.find({ classId: classObj._id }).select('_id');
+    const studentIds = students.map((s) => s._id);
+
+    const results = await Result.find({ studentId: { $in: studentIds } })
+      .populate('moduleId', 'name code')
+      .populate('studentId', 'studentId displayName')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: results.length, data: results });
+  } catch (error) {
+    console.error('getDepartmentClassResults error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve class results' });
+  }
+};
+
+// @desc    Get results for an academic period in own department
+// @route   GET /api/department-admin/results/period/:academicPeriodId
+const getPeriodResults = async (req, res) => {
+  try {
+    const results = await Result.find({ academicPeriodId: req.params.academicPeriodId })
+      .populate('moduleId', 'name code')
+      .populate('studentId', 'studentId displayName')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: results.length, data: results });
+  } catch (error) {
+    console.error('getPeriodResults error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve period results' });
+  }
+};
+// ============================================================
+// CLASS ADMIN — GET RESULTS FOR OWN CLASS
+// @desc    Get results for own class (Class Admin only)
+// @route   GET /api/class-admin/results
+// @access  Class Admin
+// ============================================================
+const getClassResults = async (req, res) => {
+  try {
+    if (!req.user.classId) {
+      return res.status(403).json({ success: false, message: 'No class assigned to your account' });
+    }
+
+    // Get all students in this class
+    const students = await Student.find({ classId: req.user.classId }).select('_id');
+    const studentIds = students.map((s) => s._id);
+
+    const results = await Result.find({ studentId: { $in: studentIds } })
+      .populate('moduleId', 'name code')
+      .populate('studentId', 'studentId displayName')
+      .populate('componentId', 'name code')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: results.length,
+      data: results
+    });
+  } catch (error) {
+    console.error('getClassResults error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve class results' });
+  }
+};
+
+// ============================================================
+// CLASS ADMIN — APPROVAL STATUS
+// ============================================================
+
+// @desc    Get my approval status
+// @route   GET /api/class-admin/approval-status
+const getMyApprovalStatus = async (req, res) => {
+  try {
+    const approvals = await ClassAdminApproval.find({
+      classAdminId: req.user._id,
+      classId: req.user.classId
+    })
+      .populate('academicLevelId', 'name code order')
+      .populate('academicPeriodId', 'name code order')
+      .populate('cohortId', 'name code admissionYear')
+      .populate('approvedBy', 'displayName email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: approvals.length, data: approvals });
+  } catch (error) {
+    console.error('getMyApprovalStatus error:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve approval status' });
+  }
+};
+
 module.exports = {
   createResult,
   bulkCreateResults,
@@ -745,5 +873,16 @@ module.exports = {
   getModuleResults,
   getStudentResults,
   updateResult,
-  deleteResult
+  deleteResult,
+
+  // Department admin — result views
+  getDepartmentResults,
+  getDepartmentClassResults,
+  getPeriodResults,
+
+  // Class admin — approval status
+  getMyApprovalStatus,
+
+  // Class admin — class results  ← ADD THIS
+  getClassResults
 };
